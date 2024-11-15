@@ -9,8 +9,6 @@ import {
   Button,
   Typography,
 } from "@material-tailwind/react";
-import { DropzoneArea } from "material-ui-dropzone";
-import { XMarkIcon } from "@heroicons/react/24/solid";
 import { toast } from "react-toastify";
 
 
@@ -18,30 +16,8 @@ export function Notifications() {
 
   const form = useForm();
   const { register, handleSubmit, reset, formState: { errors } } = form;
-  const [image, setImage] = useState(null);
-
-  const handleRemoveImage = () => {
-    setImage(null);
-  };
-  
-
-  const handleFileChange = (files) => {
-    if (files.length > 0) {
-      const file = files[0];
-      console.log('File:', file);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setImage(null);
-    }
-  };
 
   const onSubmitHandler = async (formdata) => {
-    console.log("Form data:", { ...formdata, image: image == null ? "" : image });
 
     const db = getFirestore(app);
     const clientCollectionRef = collection(db, "client");
@@ -49,11 +25,11 @@ export function Notifications() {
     try {
       await addDoc(clientCollectionRef, {
         ...formdata,
-        image: image == null ? "" : image,
+        numeraire: formdata.numeraire ? Number(formdata.numeraire) : 0,
+        budget: 0,
       });
       toast.success("Client Ajouté.");
       reset();
-      setImage(null);
     } catch (error) {
       console.error(error);
       toast.error("Échec de l'ajout du client. Veuillez réessayer.");
@@ -61,13 +37,13 @@ export function Notifications() {
   };
 
   return (
-    <div className="mx-auto my-20 flex max-w-screen-lg flex-col gap-8">
-      <Card color="transparent" shadow={false} className="mx-auto">
+    <div className="mx-auto my-20 flex max-w-screen-lg flex-col gap-8 w-full">
+      <Card color="transparent" shadow={false} className="mx-auto w-64">
       <Typography variant="h4" color="blue-gray" className="flex justify-center items-center mb-2">
         Ajouter un client
       </Typography>
       <form onSubmit={handleSubmit(onSubmitHandler)}>
-        <div className="my-1 flex flex-col gap-6">
+        <div className="my-1 flex flex-col gap-6 justify-center">
           <Typography variant="h6" color="blue-gray" className="-mb-3">
             Nom <span className="text-red-500">* {errors.nom?.message}</span>
           </Typography>
@@ -80,13 +56,38 @@ export function Notifications() {
                 className: "before:content-none after:content-none",
               }}
             />
+          <Typography variant="h6" color="blue-gray" className="-mb-3">
+            Numéraire <span className="text-red-500"> {errors.numeraire?.message}</span>
+          </Typography>
+          <Input
+              {...register("numeraire", {
+                validate: (value) =>
+                  value === null ||
+                  value === "" || // Allow null or empty strings
+                  /^\d+(\.\d{0,3})?$/.test(value) ||
+                  "Veuillez entrer un nombre avec jusqu'à 3 décimales",
+              })}
+              size="lg"
+              placeholder="500"
+              className="!border-t-blue-gray-200 focus:!border-t-gray-900"
+              labelProps={{
+                className: "before:content-none after:content-none",
+              }}
+              onInput={(e) => {
+                // Restrict input to numbers and a single decimal point with up to 3 decimal places
+                e.target.value = e.target.value
+                  .replace(/[^0-9.]/g, "") // Allow only numbers and a decimal point
+                  .replace(/(\..*)\./g, "$1") // Prevent more than one decimal point
+                  .replace(/^0+(?=\d)/, "") // Prevent leading zeros
+                  .replace(/(\.\d{2}).*/g, "$1"); // Allow only up to 3 digits after the decimal
+              }}
+            />
 
             <Typography variant="h6" color="blue-gray" className="-mb-3">
-              Adresse <span className="text-red-500">* {errors.adresse?.message}</span>
+              Adresse <span className="text-red-500"> {errors.adresse?.message}</span>
             </Typography>
             <Input
               {...register("adresse", {
-                required: "L'adresse est requise",
                 maxLength: {
                   value: 100,
                   message: "L'adresse ne peut pas dépasser 100 caractères",
@@ -100,11 +101,10 @@ export function Notifications() {
               }}
             />
             <Typography variant="h6" color="blue-gray" className="-mb-3">
-              Email <span className="text-red-500">* {errors.email?.message}</span>
+              Email <span className="text-red-500"> {errors.email?.message}</span>
             </Typography>
             <Input
               {...register("email", {
-                required: "L'email est requis",
                 pattern: {
                   value: /^\S+@\S+\.\S+$/,
                   message: "Email invalide",
@@ -119,11 +119,10 @@ export function Notifications() {
             />
 
             <Typography variant="h6" color="blue-gray" className="-mb-3">
-              Téléphone <span className="text-red-500">* {errors.telephone?.message}</span>
+              Téléphone <span className="text-red-500"> {errors.telephone?.message}</span>
             </Typography>
             <Input
               {...register("telephone", {
-                required: "Le téléphone est requis",
                 pattern: {
                   value: /^\d{1,4}[-\s]?\d{1,4}[-\s]?\d{1,4}$/,
                   message: "Numéro de téléphone invalide",
@@ -139,34 +138,11 @@ export function Notifications() {
                 e.target.value = e.target.value.replace(/[^\d\s-]/g, "").slice(0, 12);
               }}
             />
-            <DropzoneArea
-              dropzoneClass="!min-h-[100px]"
-              showPreviewsInDropzone={false}
-              acceptedFiles={['image/*']}
-              dropzoneText={"Drag and drop an image or click"}
-              onChange={handleFileChange}
-              filesLimit={1}
-            />
-            <div className="flex justify-center">
-              {image ? (
-                <div className="relative"><img src={image} alt="Preview" className="w-24 h-24 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 dark:bg-gray-700" /><button
-                type="button"
-                onClick={handleRemoveImage}
-                className="absolute -top-3 -right-3 bg-white p-1 rounded-full shadow-md"
-              >
-                <XMarkIcon className="w-6 h-6 text-gray-500" />
-              </button></div>
-
-              ) : (
-                <Typography variant="body2" color="gray-500" className="text-center">
-                  No image uploaded
-                </Typography>
-              )}
-            </div>
-          </div>
-          <Button className="mt-6" fullWidth type="submit">
+            
+          <Button fullWidth type="submit">
             Ajouter
           </Button>
+          </div>
         </form>
     </Card>
     </div>
